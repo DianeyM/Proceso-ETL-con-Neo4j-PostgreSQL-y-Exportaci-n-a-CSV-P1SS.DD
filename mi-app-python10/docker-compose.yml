@@ -1,0 +1,60 @@
+services:
+  neo4j:
+    image: neo4j:latest # Usamos una imagen slim de neo4j
+    container_name: neo4j_db_docker_python10
+    environment:
+      NEO4J_AUTH: ${NEO4J_USER}/${NEO4J_PASSWORD}
+    volumes:
+      - neo4j_data_python10:/data #neo4j_data_python10: Este es el nombre de un volumen de Docker. * /data: Esta es la ruta dentro del 
+      #contenedor de Neo4j donde los datos de la base de datos serán almacenados. 
+      - ./backend/dataset_b_lenguajes.csv:/import/dataset_b_lenguajes.csv #Bind Mount.* ./ indica la ruta actua en el host. La ruta /import/ es una carpeta 
+      # especial dentro del contenedor de Neo4j que está preconfigurada para cargar archivos, especialmente cuando usas el comando LOAD CSV
+      # para cargar datos desde archivos CSV en la DB.
+    ports:
+      - "6990:7474"  # Exponemos el puerto 7474 para la interfaz web de Neo4j.
+      - "4009:7687"  # Exponemos el puerto 7687 para el protocolo Bolt de Neo4j. El protocolo Bolt es un protocolo de comunicación binario
+      # y eficiente utilizado por Neo4j para la interacción con su base de datos de grafos.
+    networks:
+      - app_network_python10
+
+  ETL:
+    image: mi-app-python10-web:v1  # Aquí se define el nombre de la imagen del servicio web.
+    build:  ./backend #Se le indica a Docker que debe construir la imagen del contenedor usando un Dockerfile ubicado en el directorio indicado.
+    container_name: dianey-mi-app-python-docker10
+    restart: always
+    depends_on:
+      - neo4j
+    environment: #Define las variables de entorno para la aplicación
+      - FLASK_ENV=development
+    env_file:
+      - .env  # Cargar todas las variables de entorno desde el archivo .env
+    networks:
+      - app_network_python10
+    ports:
+      - "${FLASK_PORT}:5010"
+    volumes:
+      - ./backend/students.json:/app/students.json
+
+  PostgreSQL:
+    image: postgres:13-alpine  # Usamos una imagen oficial de PostgreSQL
+    container_name: postgres_db_docker_python10
+    environment:
+      POSTGRES_USER: postgres  # Usuario de PostgreSQL
+      POSTGRES_PASSWORD: postgres  # Contraseña de PostgreSQL
+      POSTGRES_DB: etl_db  # Base de datos que se creará al iniciar
+    volumes:
+      - postgres_data:/var/lib/postgresql/data  #Volumen para persistir los datos de la base de datos. *postgres_data: Es el nombre del 
+      #volumen. * /var/lib/postgresql/data: Es la ubicación interna dentro del contenedor de PostgreSQL donde se almacenan los datos de la
+      #base de datos.
+    ports:
+      - "5432:5432"  # Exponemos el puerto 5432 para conectarnos a PostgreSQL
+    networks:
+      - app_network_python10
+
+volumes:
+  neo4j_data_python10:
+  postgres_data:
+
+networks:
+  app_network_python10:
+    driver: bridge
